@@ -111,7 +111,7 @@
   </div>
 
   <script>
-    // 하트 기록을 뺀 과거 데이터 (5월 피임약 포함, 7/8월 부정출혈 포함)
+    // 하트 기록 제외, 과거 생리/부정출혈/피임약 데이터 유지
     let logs = {
       "2026-05-10": { period: true },
       "2026-05-11": { period: true },
@@ -136,9 +136,9 @@
       "2026-10-22": { period: true }
     };
 
-    let currentDate = new Date();
-    // 접속 기준 오늘을 2026년 11월 4일로 설정 (요청 상황 맞춤)
-    const today = new Date(2026, 10, 4); 
+    // 실제 오늘 날짜 자동 연동
+    const today = new Date(); 
+    let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDateStr = "";
 
     function fmtDate(d) {
@@ -150,7 +150,6 @@
       let currentCycleStart = null;
       let hasPillInCycle = false;
 
-      // 생리 시작일 및 피임약 여부 찾기
       const sortedDates = Object.keys(logs).sort();
       sortedDates.forEach(dateStr => {
         if (logs[dateStr].period) {
@@ -175,11 +174,11 @@
       let validCycles = 0;
 
       for (let i = 0; i < periodStarts.length - 1; i++) {
-        if (!periodStarts[i].pill) { // 피임약 먹은 주기 제외
+        if (!periodStarts[i].pill) { 
           let d1 = new Date(periodStarts[i].start);
           let d2 = new Date(periodStarts[i+1].start);
           let diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-          if (diff >= 20 && diff <= 45) { // 유효 주기만 반영
+          if (diff >= 20 && diff <= 45) { 
             totalDays += diff;
             validCycles++;
           }
@@ -222,9 +221,9 @@
         document.getElementById('status-desc').innerText = `평균 ${avgCycle}일 주기로 계산됨`;
       } else {
         document.getElementById('status-title').innerText = `기록을 시작해주세요`;
+        document.getElementById('status-desc').innerText = `과거 데이터를 기반으로 분석합니다.`;
       }
 
-      // 달력 빈칸 채우기
       for (let i = 0; i < firstDay; i++) {
         grid.innerHTML += `<div class="h-14"></div>`;
       }
@@ -248,24 +247,19 @@
           dotHTML = `<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full z-20"></div>`;
         }
 
-        // 예측일 및 가임기 계산
         if (nextPeriod && !log.period) {
           let diffFromNext = Math.round((d - nextPeriod) / (1000 * 60 * 60 * 24));
-          // 예정일 (5일간)
           if (diffFromNext >= 0 && diffFromNext < 5) {
             bgClass = "bg-stripes-predict border border-red-200 text-red-600";
           }
-          // 생리 가능일 (예정일 전 3일)
           else if (diffFromNext >= -3 && diffFromNext < 0) {
              bgClass = "bg-stripes-possible border border-red-100 text-red-400";
           }
-          // 배란/가임기 (예정일 - 14일 기준 앞뒤 3일)
           else if (diffFromNext >= -17 && diffFromNext <= -11) {
             bgClass = "bg-red-50 text-red-400";
           }
         }
 
-        // 오늘 날짜 하이라이트 (테두리 굵게)
         let todayRing = isToday ? 'ring-2 ring-pink-300 font-bold' : '';
 
         grid.innerHTML += `
@@ -324,9 +318,9 @@
       setTimeout(renderCalendar, 300);
     }
 
-    // 초기 달력을 2026년 11월로 맞춤
-    currentDate = new Date(2026, 10, 1);
+    // 앱 실행 시 첫 달력 렌더링
     renderCalendar();
   </script>
 </body>
 </html>
+
