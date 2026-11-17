@@ -111,7 +111,8 @@
       "2026-08-02": { spotting: true }, "2026-08-03": { spotting: true }, "2026-08-04": { spotting: true },
       "2026-09-20": { period: true }, "2026-09-21": { period: true }, "2026-09-22": { period: true }, "2026-09-23": { period: true }, "2026-09-24": { period: true },
       "2026-10-18": { period: true }, "2026-10-19": { period: true }, "2026-10-20": { period: true }, "2026-10-21": { period: true }, "2026-10-22": { period: true },
-      "2026-11-16": { period: true } // 11월 16일 생리 시작 추가 완료!
+      // 11월 16일 ~ 20일까지 5일치 기본 등록 완료
+      "2026-11-16": { period: true }, "2026-11-17": { period: true }, "2026-11-18": { period: true }, "2026-11-19": { period: true }, "2026-11-20": { period: true }
     };
 
     let logs = defaultLogs; 
@@ -270,8 +271,26 @@
       const pill = document.getElementById('toggle-pill').checked;
       const heart = document.getElementById('toggle-heart').checked;
 
-      if (period || spotting || pill || heart) logs[selectedDateStr] = { period, spotting, pill, heart };
-      else delete logs[selectedDateStr];
+      // 수정 전 원래 생리 상태였는지 확인
+      const wasPeriod = logs[selectedDateStr] ? logs[selectedDateStr].period : false;
+
+      // 현재 날짜 저장
+      if (period || spotting || pill || heart) {
+        logs[selectedDateStr] = { period, spotting, pill, heart };
+      } else {
+        delete logs[selectedDateStr];
+      }
+
+      // '생리 했음'을 새로 켰을 때만 뒤로 4일(총 5일) 자동 채우기
+      if (period && !wasPeriod) {
+        let d = new Date(selectedDateStr);
+        for (let i = 1; i < 5; i++) {
+          d.setDate(d.getDate() + 1);
+          let nextDateStr = fmtDate(d);
+          if (!logs[nextDateStr]) logs[nextDateStr] = {};
+          logs[nextDateStr].period = true;
+        }
+      }
       
       closeModal();
       renderCalendar(); 
