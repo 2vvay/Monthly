@@ -28,8 +28,8 @@
   <div class="px-6 mb-6">
     <div class="bg-white rounded-3xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
       <p class="text-sm text-gray-500 mb-1 font-medium">예정일 안내</p>
-      <h2 id="status-title" class="text-2xl font-bold mb-2">데이터 불러오는 중...</h2>
-      <p id="status-desc" class="text-gray-400 text-sm">잠시만 기다려주세요.</p>
+      <h2 id="status-title" class="text-2xl font-bold mb-2">계산 중...</h2>
+      <p id="status-desc" class="text-gray-400 text-sm">기록을 분석하고 있습니다.</p>
     </div>
   </div>
 
@@ -119,13 +119,11 @@
       let savedLocal = localStorage.getItem('myCycleLogs');
       if (savedLocal) {
         let parsed = JSON.parse(savedLocal);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
           logs = parsed;
         }
       }
-    } catch(e) {
-      localStorage.removeItem('myCycleLogs'); 
-    }
+    } catch(e) {}
 
     const today = new Date(); 
     let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -141,17 +139,13 @@
         const text = await response.text();
         let data = JSON.parse(text);
         
-        if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0) {
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
           logs = data; 
           localStorage.setItem('myCycleLogs', JSON.stringify(logs));
         }
         updateSyncStatus("연결됨", "bg-green-400");
       } catch (error) {
         updateSyncStatus("로컬 모드", "bg-gray-400"); 
-      }
-      
-      if (!logs || typeof logs !== 'object') {
-        logs = JSON.parse(JSON.stringify(defaultLogs));
       }
       renderCalendar();
     }
@@ -290,7 +284,6 @@
       const spotting = document.getElementById('toggle-spotting').checked;
       const pill = document.getElementById('toggle-pill').checked;
       const heart = document.getElementById('toggle-heart').checked;
-
       const wasPeriod = logs[selectedDateStr] ? logs[selectedDateStr].period : false;
 
       // 1. 현재 날짜 데이터 등록/삭제
@@ -300,7 +293,7 @@
         delete logs[selectedDateStr];
       }
 
-      // 2. 생리 '새로 켰을 때' (자동 4일 추가)
+      // 2. 생리 켰을 때 (자동 4일 추가)
       if (period && !wasPeriod) {
         let d = new Date(selectedDateStr);
         for (let i = 1; i < 5; i++) {
@@ -311,7 +304,7 @@
         }
       }
       
-      // 3. 생리 '취소(삭제) 했을 때' (자동 추가됐던 4일치 지우기)
+      // 3. 생리 껐을 때 (자동 추가됐던 4일치 지우기)
       if (!period && wasPeriod) {
         let d = new Date(selectedDateStr);
         for (let i = 1; i < 5; i++) {
@@ -332,10 +325,11 @@
 
       updateSyncStatus("저장 중...", "bg-yellow-400");
       try {
-        // [핵심 변경점] 브라우저가 절대 차단하지 않는 폼(Form) 전송 방식으로 구글 시트에 바로 꽂아 넣기
         await fetch(SCRIPT_URL, {
           method: 'POST',
-          body: new URLSearchParams({ 'data': JSON.stringify(logs) })
+          mode: 'no-cors',
+          body: JSON.stringify(logs),
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
         updateSyncStatus("연결됨", "bg-green-400");
       } catch(e) {
