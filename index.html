@@ -7,15 +7,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #F5F5F7; -webkit-tap-highlight-color: transparent; }
-    .bg-stripes-predict {
-      background-image: repeating-linear-gradient(45deg, #fff, #fff 3px, #fca5a5 3px, #fca5a5 6px);
-    }
-    .bg-stripes-possible {
-      background-image: repeating-linear-gradient(45deg, #fff, #fff 3px, #fecdd3 3px, #fecdd3 6px);
-    }
+    .bg-stripes-predict { background-image: repeating-linear-gradient(45deg, #fff, #fff 3px, #fca5a5 3px, #fca5a5 6px); }
+    .bg-stripes-possible { background-image: repeating-linear-gradient(45deg, #fff, #fff 3px, #fecdd3 3px, #fecdd3 6px); }
     .modal-up { transform: translateY(0); }
     .modal-down { transform: translateY(100%); }
-    .hide-scrollbar::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body class="font-sans text-gray-900 pb-20">
@@ -23,9 +18,9 @@
   <!-- Header -->
   <div class="pt-12 pb-4 px-6 flex justify-between items-center">
     <h1 class="text-3xl font-bold tracking-tight">Cycle</h1>
-    <div class="flex items-center space-x-2 text-sm text-gray-500 bg-white px-3 py-1.5 rounded-full shadow-sm">
-      <div class="w-2 h-2 rounded-full bg-green-400"></div>
-      <span>기록 중</span>
+    <div class="flex items-center space-x-2 text-sm bg-white px-3 py-1.5 rounded-full shadow-sm" id="sync-status">
+      <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+      <span class="text-gray-500">동기화 중...</span>
     </div>
   </div>
 
@@ -33,8 +28,8 @@
   <div class="px-6 mb-6">
     <div class="bg-white rounded-3xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
       <p class="text-sm text-gray-500 mb-1 font-medium">예정일 안내</p>
-      <h2 id="status-title" class="text-2xl font-bold mb-2">기록을 분석 중입니다</h2>
-      <p id="status-desc" class="text-gray-400 text-sm">평균 주기로 자동 계산됩니다.</p>
+      <h2 id="status-title" class="text-2xl font-bold mb-2">데이터 불러오는 중...</h2>
+      <p id="status-desc" class="text-gray-400 text-sm">잠시만 기다려주세요.</p>
     </div>
   </div>
 
@@ -78,17 +73,14 @@
     </button>
   </div>
 
-  <!-- Backdrop -->
+  <!-- Backdrop & Modal -->
   <div id="backdrop" onclick="closeModal()" class="fixed inset-0 bg-black/20 opacity-0 pointer-events-none transition-opacity duration-300 z-40"></div>
-
-  <!-- Bottom Sheet Modal -->
   <div id="modal" class="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] p-6 pt-2 z-50 transition-transform duration-300 modal-down shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
     <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto my-3 mb-6"></div>
     <div class="flex justify-between items-center mb-6">
       <h3 id="modal-date" class="text-xl font-bold"></h3>
       <button onclick="closeModal()" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold">✕</button>
     </div>
-    
     <div class="space-y-3 mb-8">
       <label class="flex items-center justify-between p-4 bg-[#F5F5F7] rounded-2xl active:bg-gray-200 transition-colors">
         <span class="font-medium flex items-center"><div class="w-3 h-3 rounded-full bg-red-400 mr-3"></div>생리 했음</span>
@@ -111,38 +103,41 @@
   </div>
 
   <script>
-    // 하트 기록 제외, 과거 생리/부정출혈/피임약 데이터 유지
-    let logs = {
-      "2026-05-10": { period: true },
-      "2026-05-11": { period: true },
-      "2026-05-12": { period: true, pill: true },
-      "2026-05-13": { period: true },
-      "2026-07-29": { spotting: true },
-      "2026-07-30": { spotting: true },
-      "2026-07-31": { spotting: true },
-      "2026-08-01": { spotting: true },
-      "2026-08-02": { spotting: true },
-      "2026-08-03": { spotting: true },
-      "2026-08-04": { spotting: true },
-      "2026-09-20": { period: true },
-      "2026-09-21": { period: true },
-      "2026-09-22": { period: true },
-      "2026-09-23": { period: true },
-      "2026-09-24": { period: true },
-      "2026-10-18": { period: true },
-      "2026-10-19": { period: true },
-      "2026-10-20": { period: true },
-      "2026-10-21": { period: true },
-      "2026-10-22": { period: true }
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyBY_GQCZ3q6w9ZT5E06H15g_uhl-qTuYZZy7RKwNKA_SsOpRk1K1sS6pBclaWjnvi-/exec';
+
+    const defaultLogs = {
+      "2026-05-10": { period: true }, "2026-05-11": { period: true }, "2026-05-12": { period: true, pill: true }, "2026-05-13": { period: true },
+      "2026-07-29": { spotting: true }, "2026-07-30": { spotting: true }, "2026-07-31": { spotting: true }, "2026-08-01": { spotting: true },
+      "2026-08-02": { spotting: true }, "2026-08-03": { spotting: true }, "2026-08-04": { spotting: true },
+      "2026-09-20": { period: true }, "2026-09-21": { period: true }, "2026-09-22": { period: true }, "2026-09-23": { period: true }, "2026-09-24": { period: true },
+      "2026-10-18": { period: true }, "2026-10-19": { period: true }, "2026-10-20": { period: true }, "2026-10-21": { period: true }, "2026-10-22": { period: true },
+      "2026-11-16": { period: true } // 11월 16일 생리 시작 추가 완료!
     };
 
-    // 실제 오늘 날짜 자동 연동
+    let logs = defaultLogs; 
     const today = new Date(); 
     let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDateStr = "";
 
     function fmtDate(d) {
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    async function loadData() {
+      try {
+        const response = await fetch(SCRIPT_URL);
+        const data = await response.json();
+        if (Object.keys(data).length > 0) logs = data; 
+        updateSyncStatus("연결됨", "bg-green-400");
+      } catch (error) {
+        updateSyncStatus("로컬 모드", "bg-gray-400"); 
+      }
+      renderCalendar();
+    }
+
+    function updateSyncStatus(text, colorClass) {
+      const statusDiv = document.getElementById('sync-status');
+      statusDiv.innerHTML = `<div class="w-2 h-2 rounded-full ${colorClass}"></div><span class="text-gray-500">${text}</span>`;
     }
 
     function calculatePredictions() {
@@ -157,31 +152,22 @@
           let prev = new Date(d);
           prev.setDate(prev.getDate() - 1);
           if (!logs[fmtDate(prev)] || !logs[fmtDate(prev)].period) {
-            if (currentCycleStart) {
-              periodStarts.push({ start: currentCycleStart, pill: hasPillInCycle });
-            }
+            if (currentCycleStart) periodStarts.push({ start: currentCycleStart, pill: hasPillInCycle });
             currentCycleStart = dateStr;
             hasPillInCycle = false;
           }
         }
         if (logs[dateStr].pill) hasPillInCycle = true;
       });
-      if (currentCycleStart) {
-        periodStarts.push({ start: currentCycleStart, pill: hasPillInCycle });
-      }
+      if (currentCycleStart) periodStarts.push({ start: currentCycleStart, pill: hasPillInCycle });
 
-      let totalDays = 0;
-      let validCycles = 0;
-
+      let totalDays = 0; let validCycles = 0;
       for (let i = 0; i < periodStarts.length - 1; i++) {
-        if (!periodStarts[i].pill) { 
+        if (!periodStarts[i].pill) {  
           let d1 = new Date(periodStarts[i].start);
           let d2 = new Date(periodStarts[i+1].start);
           let diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-          if (diff >= 20 && diff <= 45) { 
-            totalDays += diff;
-            validCycles++;
-          }
+          if (diff >= 20 && diff <= 45) { totalDays += diff; validCycles++; }
         }
       }
 
@@ -193,7 +179,6 @@
         nextPeriod = new Date(lastStart);
         nextPeriod.setDate(nextPeriod.getDate() + avgCycle);
       }
-
       return { avgCycle, nextPeriod };
     }
 
@@ -211,22 +196,16 @@
 
       if (nextPeriod) {
         let diff = Math.round((nextPeriod - today) / (1000 * 60 * 60 * 24));
-        if (diff > 0) {
-          document.getElementById('status-title').innerText = `${diff}일 뒤 시작 예정`;
-        } else if (diff === 0) {
-          document.getElementById('status-title').innerText = `오늘 시작 예정`;
-        } else {
-          document.getElementById('status-title').innerText = `${Math.abs(diff)}일 지연됨`;
-        }
+        if (diff > 0) document.getElementById('status-title').innerText = `${diff}일 뒤 시작 예정`;
+        else if (diff === 0) document.getElementById('status-title').innerText = `오늘 시작 예정`;
+        else document.getElementById('status-title').innerText = `진행 중 또는 지연됨`;
         document.getElementById('status-desc').innerText = `평균 ${avgCycle}일 주기로 계산됨`;
       } else {
         document.getElementById('status-title').innerText = `기록을 시작해주세요`;
         document.getElementById('status-desc').innerText = `과거 데이터를 기반으로 분석합니다.`;
       }
 
-      for (let i = 0; i < firstDay; i++) {
-        grid.innerHTML += `<div class="h-14"></div>`;
-      }
+      for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="h-14"></div>`;
 
       for (let i = 1; i <= daysInMonth; i++) {
         let d = new Date(year, month, i);
@@ -234,30 +213,19 @@
         let log = logs[dateStr] || {};
         let isToday = fmtDate(d) === fmtDate(today);
 
-        let bgClass = "bg-white";
-        let textClass = "text-gray-700";
+        let bgClass = "bg-white", textClass = "text-gray-700";
         let innerHTML = `<span class="relative z-10">${i}</span>`;
-        let dotHTML = '';
+        let dotHTML = log.spotting ? `<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full z-20"></div>` : '';
         let heartHTML = log.heart ? `<div class="absolute top-0 right-0 text-[10px] z-20">❤️</div>` : '';
         let pillHTML = log.pill ? `<div class="absolute -bottom-1 -right-1 text-[12px] z-20">💊</div>` : '';
 
         if (log.period) {
           bgClass = "bg-red-400 text-white";
-        } else if (log.spotting) {
-          dotHTML = `<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full z-20"></div>`;
-        }
-
-        if (nextPeriod && !log.period) {
+        } else if (nextPeriod) {
           let diffFromNext = Math.round((d - nextPeriod) / (1000 * 60 * 60 * 24));
-          if (diffFromNext >= 0 && diffFromNext < 5) {
-            bgClass = "bg-stripes-predict border border-red-200 text-red-600";
-          }
-          else if (diffFromNext >= -3 && diffFromNext < 0) {
-             bgClass = "bg-stripes-possible border border-red-100 text-red-400";
-          }
-          else if (diffFromNext >= -17 && diffFromNext <= -11) {
-            bgClass = "bg-red-50 text-red-400";
-          }
+          if (diffFromNext >= 0 && diffFromNext < 5) bgClass = "bg-stripes-predict border border-red-200 text-red-600";
+          else if (diffFromNext >= -3 && diffFromNext < 0) bgClass = "bg-stripes-possible border border-red-100 text-red-400";
+          else if (diffFromNext >= -17 && diffFromNext <= -11) bgClass = "bg-red-50 text-red-400";
         }
 
         let todayRing = isToday ? 'ring-2 ring-pink-300 font-bold' : '';
@@ -266,26 +234,19 @@
           <div onclick="openModal(new Date(${year}, ${month}, ${i}))" 
                class="h-14 relative flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform">
             <div class="w-10 h-10 rounded-full flex items-center justify-center relative ${bgClass} ${textClass} ${todayRing}">
-              ${innerHTML}
-              ${dotHTML}
-              ${heartHTML}
-              ${pillHTML}
+              ${innerHTML}${dotHTML}${heartHTML}${pillHTML}
             </div>
           </div>
         `;
       }
     }
 
-    function changeMonth(delta) {
-      currentDate.setMonth(currentDate.getMonth() + delta);
-      renderCalendar();
-    }
-
+    function changeMonth(delta) { currentDate.setMonth(currentDate.getMonth() + delta); renderCalendar(); }
+    
     function openModal(d) {
       selectedDateStr = fmtDate(d);
       const days = ['일','월','화','수','목','금','토'];
       document.getElementById('modal-date').innerText = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
-      
       const log = logs[selectedDateStr] || {};
       document.getElementById('toggle-period').checked = !!log.period;
       document.getElementById('toggle-spotting').checked = !!log.spotting;
@@ -303,24 +264,32 @@
       document.getElementById('modal').classList.replace('modal-up', 'modal-down');
     }
 
-    function saveLog() {
+    async function saveLog() {
       const period = document.getElementById('toggle-period').checked;
       const spotting = document.getElementById('toggle-spotting').checked;
       const pill = document.getElementById('toggle-pill').checked;
       const heart = document.getElementById('toggle-heart').checked;
 
-      if (period || spotting || pill || heart) {
-        logs[selectedDateStr] = { period, spotting, pill, heart };
-      } else {
-        delete logs[selectedDateStr];
-      }
+      if (period || spotting || pill || heart) logs[selectedDateStr] = { period, spotting, pill, heart };
+      else delete logs[selectedDateStr];
+      
       closeModal();
-      setTimeout(renderCalendar, 300);
+      renderCalendar(); 
+
+      updateSyncStatus("저장 중...", "bg-yellow-400");
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(logs),
+          headers: { 'Content-Type': 'text/plain' } 
+        });
+        updateSyncStatus("연결됨", "bg-green-400");
+      } catch(e) {
+        updateSyncStatus("오류 발생", "bg-red-400");
+      }
     }
 
-    // 앱 실행 시 첫 달력 렌더링
-    renderCalendar();
+    loadData();
   </script>
 </body>
 </html>
-
