@@ -114,7 +114,6 @@
       "2026-11-16": { period: true }, "2026-11-17": { period: true }, "2026-11-18": { period: true }, "2026-11-19": { period: true }, "2026-11-20": { period: true }
     };
 
-    // 데이터 깨짐 완전 방어 로직
     let logs = JSON.parse(JSON.stringify(defaultLogs)); 
     try {
       let savedLocal = localStorage.getItem('myCycleLogs');
@@ -125,7 +124,7 @@
         }
       }
     } catch(e) {
-      localStorage.removeItem('myCycleLogs'); // 깨진 데이터 발견 시 즉시 폭파
+      localStorage.removeItem('myCycleLogs'); 
     }
 
     const today = new Date(); 
@@ -138,22 +137,19 @@
 
     async function loadData() {
       try {
-        const response = await fetch(SCRIPT_URL, { cache: "no-store" });
+        const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
         const text = await response.text();
         let data = JSON.parse(text);
         
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
+        if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0) {
           logs = data; 
           localStorage.setItem('myCycleLogs', JSON.stringify(logs));
-          updateSyncStatus("연결됨", "bg-green-400");
-        } else {
-          throw new Error("Invalid Data");
         }
+        updateSyncStatus("연결됨", "bg-green-400");
       } catch (error) {
         updateSyncStatus("로컬 모드", "bg-gray-400"); 
       }
       
-      // 어떤 에러가 나도 달력이 다운되지 않게 최후 방어선 구축
       if (!logs || typeof logs !== 'object') {
         logs = JSON.parse(JSON.stringify(defaultLogs));
       }
@@ -315,7 +311,7 @@
         }
       }
       
-      // 3. 생리 '취소(삭제) 했을 때' (자동 추가됐던 4일치 싹 지우기)
+      // 3. 생리 '취소(삭제) 했을 때' (자동 추가됐던 4일치 지우기)
       if (!period && wasPeriod) {
         let d = new Date(selectedDateStr);
         for (let i = 1; i < 5; i++) {
@@ -336,11 +332,10 @@
 
       updateSyncStatus("저장 중...", "bg-yellow-400");
       try {
+        // [핵심 변경점] 브라우저가 절대 차단하지 않는 폼(Form) 전송 방식으로 구글 시트에 바로 꽂아 넣기
         await fetch(SCRIPT_URL, {
           method: 'POST',
-          mode: 'no-cors', // 모바일 에러 우회 및 강제 저장 (필수)
-          body: JSON.stringify(logs),
-          headers: { 'Content-Type': 'text/plain' } // 구글 규격 준수
+          body: new URLSearchParams({ 'data': JSON.stringify(logs) })
         });
         updateSyncStatus("연결됨", "bg-green-400");
       } catch(e) {
