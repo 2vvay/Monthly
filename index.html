@@ -20,7 +20,7 @@
     <h1 class="text-3xl font-bold tracking-tight">Cycle</h1>
     <div class="flex items-center space-x-2 text-sm bg-white px-3 py-1.5 rounded-full shadow-sm" id="sync-status">
       <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
-      <span class="text-gray-500">동기화 중...</span>
+      <span class="text-gray-500">동기화 준비...</span>
     </div>
   </div>
 
@@ -114,7 +114,10 @@
       "2026-11-16": { period: true }, "2026-11-17": { period: true }, "2026-11-18": { period: true }, "2026-11-19": { period: true }, "2026-11-20": { period: true }
     };
 
-    let logs = defaultLogs; 
+    // 로컬 백업과 구글 시트를 이중으로 활용
+    let savedLocalLogs = localStorage.getItem('myCycleLogs');
+    let logs = savedLocalLogs ? JSON.parse(savedLocalLogs) : defaultLogs; 
+
     const today = new Date(); 
     let currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDateStr = "";
@@ -125,13 +128,15 @@
 
     async function loadData() {
       try {
-        // [수정됨] 뒤에 시간값을 붙여서 브라우저가 옛날 캐시를 불러오지 못하게 강제 방지
         const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
         const data = await response.json();
-        if (Object.keys(data).length > 0) logs = data; 
+        if (Object.keys(data).length > 0) {
+          logs = data; 
+          localStorage.setItem('myCycleLogs', JSON.stringify(logs)); // 로컬 백업
+        }
         updateSyncStatus("연결됨", "bg-green-400");
       } catch (error) {
-        updateSyncStatus("로컬 모드", "bg-gray-400"); 
+        updateSyncStatus("로컬 모드", "bg-gray-400"); // 에러 시 저장된 로컬 데이터 유지
       }
       renderCalendar();
     }
@@ -189,124 +194,4 @@
       document.getElementById('month-display').innerText = `${year}년 ${month + 1}월`;
 
       const firstDay = new Date(year, month, 1).getDay();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const grid = document.getElementById('calendar-grid');
-      grid.innerHTML = '';
-
-      const { avgCycle, nextPeriod } = calculatePredictions();
-
-      if (nextPeriod) {
-        let diff = Math.round((nextPeriod - today) / (1000 * 60 * 60 * 24));
-        if (diff > 0) document.getElementById('status-title').innerText = `${diff}일 뒤 시작 예정`;
-        else if (diff === 0) document.getElementById('status-title').innerText = `오늘 시작 예정`;
-        else document.getElementById('status-title').innerText = `진행 중 또는 지연됨`;
-        document.getElementById('status-desc').innerText = `평균 ${avgCycle}일 주기로 계산됨`;
-      } else {
-        document.getElementById('status-title').innerText = `기록을 시작해주세요`;
-        document.getElementById('status-desc').innerText = `과거 데이터를 기반으로 분석합니다.`;
-      }
-
-      for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="h-14"></div>`;
-
-      for (let i = 1; i <= daysInMonth; i++) {
-        let d = new Date(year, month, i);
-        let dateStr = fmtDate(d);
-        let log = logs[dateStr] || {};
-        let isToday = fmtDate(d) === fmtDate(today);
-
-        let bgClass = "bg-white", textClass = "text-gray-700";
-        let innerHTML = `<span class="relative z-10">${i}</span>`;
-        let dotHTML = log.spotting ? `<div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-pink-400 rounded-full z-20"></div>` : '';
-        let heartHTML = log.heart ? `<div class="absolute top-0 right-0 text-[10px] z-20">❤️</div>` : '';
-        let pillHTML = log.pill ? `<div class="absolute -bottom-1 -right-1 text-[12px] z-20">💊</div>` : '';
-
-        if (log.period) {
-          bgClass = "bg-red-400 text-white";
-        } else if (nextPeriod) {
-          let diffFromNext = Math.round((d - nextPeriod) / (1000 * 60 * 60 * 24));
-          if (diffFromNext >= 0 && diffFromNext < 5) bgClass = "bg-stripes-predict border border-red-200 text-red-600";
-          else if (diffFromNext >= -3 && diffFromNext < 0) bgClass = "bg-stripes-possible border border-red-100 text-red-400";
-          else if (diffFromNext >= -17 && diffFromNext <= -11) bgClass = "bg-red-50 text-red-400";
-        }
-
-        let todayRing = isToday ? 'ring-2 ring-pink-300 font-bold' : '';
-
-        grid.innerHTML += `
-          <div onclick="openModal(new Date(${year}, ${month}, ${i}))" 
-               class="h-14 relative flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center relative ${bgClass} ${textClass} ${todayRing}">
-              ${innerHTML}${dotHTML}${heartHTML}${pillHTML}
-            </div>
-          </div>
-        `;
-      }
-    }
-
-    function changeMonth(delta) { currentDate.setMonth(currentDate.getMonth() + delta); renderCalendar(); }
-    
-    function openModal(d) {
-      selectedDateStr = fmtDate(d);
-      const days = ['일','월','화','수','목','금','토'];
-      document.getElementById('modal-date').innerText = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
-      const log = logs[selectedDateStr] || {};
-      document.getElementById('toggle-period').checked = !!log.period;
-      document.getElementById('toggle-spotting').checked = !!log.spotting;
-      document.getElementById('toggle-pill').checked = !!log.pill;
-      document.getElementById('toggle-heart').checked = !!log.heart;
-
-      document.getElementById('backdrop').classList.replace('opacity-0', 'opacity-100');
-      document.getElementById('backdrop').classList.replace('pointer-events-none', 'pointer-events-auto');
-      document.getElementById('modal').classList.replace('modal-down', 'modal-up');
-    }
-
-    function closeModal() {
-      document.getElementById('backdrop').classList.replace('opacity-100', 'opacity-0');
-      document.getElementById('backdrop').classList.replace('pointer-events-auto', 'pointer-events-none');
-      document.getElementById('modal').classList.replace('modal-up', 'modal-down');
-    }
-
-    async function saveLog() {
-      const period = document.getElementById('toggle-period').checked;
-      const spotting = document.getElementById('toggle-spotting').checked;
-      const pill = document.getElementById('toggle-pill').checked;
-      const heart = document.getElementById('toggle-heart').checked;
-
-      const wasPeriod = logs[selectedDateStr] ? logs[selectedDateStr].period : false;
-
-      if (period || spotting || pill || heart) {
-        logs[selectedDateStr] = { period, spotting, pill, heart };
-      } else {
-        delete logs[selectedDateStr];
-      }
-
-      if (period && !wasPeriod) {
-        let d = new Date(selectedDateStr);
-        for (let i = 1; i < 5; i++) {
-          d.setDate(d.getDate() + 1);
-          let nextDateStr = fmtDate(d);
-          if (!logs[nextDateStr]) logs[nextDateStr] = {};
-          logs[nextDateStr].period = true;
-        }
-      }
-      
-      closeModal();
-      renderCalendar(); 
-
-      updateSyncStatus("저장 중...", "bg-yellow-400");
-      try {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors', // [수정됨] 스마트폰 브라우저 보안 에러로 저장이 막히는 현상 해결
-          body: JSON.stringify(logs),
-          headers: { 'Content-Type': 'text/plain' } 
-        });
-        updateSyncStatus("연결됨", "bg-green-400");
-      } catch(e) {
-        updateSyncStatus("오류 발생", "bg-red-400");
-      }
-    }
-
-    loadData();
-  </script>
-</body>
-</html>
+      const daysIn
